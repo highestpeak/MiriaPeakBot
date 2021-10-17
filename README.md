@@ -1,0 +1,4 @@
+色图或者r18这样的配置，每个一个imageConfig就好了
+
+色图一个imageConfig
+r18一个imageConfig
