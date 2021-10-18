@@ -3,10 +3,10 @@ package com.highestpeak.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.highestpeak.entity.Constants;
-import com.highestpeak.util.LogUtil;
 import com.highestpeak.PeakBot;
+import com.highestpeak.entity.Constants;
 import com.highestpeak.entity.PeakBotException;
+import com.highestpeak.util.LogUtil;
 import lombok.Data;
 import org.apache.commons.io.FileUtils;
 
@@ -14,8 +14,9 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Data
 public class Config {
@@ -24,7 +25,7 @@ public class Config {
 
     private static AtomicBoolean prepareUpdateConfig = new AtomicBoolean(false);
 
-    private static AtomicLong prepareStartTime = new AtomicLong(0);
+    private static final BlockingQueue<Object> UPDATE_REQUEST_QUEUE = new LinkedBlockingDeque<>();
 
     private boolean debug = false;
 
@@ -71,10 +72,15 @@ public class Config {
     private static final Long CONFIG_UPDATE_DELAY = 2000L;
 
     private static final Thread UPDATE_THREAD = new Thread(() -> {
-        while (true) {
-            if (prepareUpdateConfig.get() &&
-                    System.currentTimeMillis() - prepareStartTime.get() >= CONFIG_UPDATE_DELAY) {
-                updateConfig();
+        while (!Thread.interrupted()) {
+            try {
+                UPDATE_REQUEST_QUEUE.take();
+                Thread.sleep(CONFIG_UPDATE_DELAY);
+                if (prepareUpdateConfig.get()) {
+                    updateConfig();
+                }
+            } catch (Exception e) {
+                LogUtil.error("exception in update config thread while loop.", e);
             }
         }
     });
@@ -108,8 +114,12 @@ public class Config {
      * 准备去重新加载配置：延迟执行，短时间多个更新只执行一次
      */
     public static void prepareUpdateConfig() {
-        // 当正在准备的时候就不需要再设置为 true 了
-        prepareUpdateConfig.compareAndSet(false, true);
+        if (!prepareUpdateConfig.get()) {
+            // 短时间内第一次触发更新
+            prepareUpdateConfig.compareAndSet(false, true);
+            UPDATE_REQUEST_QUEUE.offer(new Object());
+        }
+        // 已经触发过更新
     }
 
     private static void updateConfig() {

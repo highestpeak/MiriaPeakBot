@@ -2,23 +2,26 @@ package com.highestpeak.commond;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Lists;
+import com.highestpeak.PeakBot;
 import com.highestpeak.config.ApiStrConfig;
 import com.highestpeak.entity.CommandChatType;
 import com.highestpeak.entity.CommandUserType;
 import com.highestpeak.entity.ImageVo;
 import com.highestpeak.entity.MsgEventParams;
-import com.highestpeak.util.CommonUtil;
-import com.highestpeak.util.IdUtil;
-import com.highestpeak.util.JsonUtil;
-import com.highestpeak.util.LogUtil;
+import com.highestpeak.util.*;
 import lombok.NonNull;
 import net.mamoe.mirai.contact.Friend;
 import net.mamoe.mirai.contact.Group;
+import net.mamoe.mirai.message.code.MiraiCode;
+import net.mamoe.mirai.message.data.Image;
+import net.mamoe.mirai.utils.ExternalResource;
 import org.apache.commons.lang3.StringUtils;
 
+import java.io.FileInputStream;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 通过某个图片api来获取图片

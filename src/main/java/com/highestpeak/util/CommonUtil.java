@@ -14,6 +14,7 @@ import org.apache.http.conn.ConnectTimeoutException;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 
+import javax.net.ssl.SSLHandshakeException;
 import java.io.File;
 import java.net.SocketTimeoutException;
 import java.nio.file.FileSystemException;
@@ -73,6 +74,9 @@ public class CommonUtil {
             return StringUtils.EMPTY;
         } catch (SocketTimeoutException e) {
             LogUtil.warn("下载图片超时 uri:" + uri);
+            return StringUtils.EMPTY;
+        } catch (SSLHandshakeException e) {
+            LogUtil.warn("下载图片失败. ssl 异常" + e.getMessage());
             return StringUtils.EMPTY;
         } catch (Exception e) {
             LogUtil.error("下载图片失败", e);

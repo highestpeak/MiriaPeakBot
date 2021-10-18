@@ -3,6 +3,7 @@ package com.highestpeak.commond;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.highestpeak.PeakBot;
 import com.highestpeak.config.ApiConfig;
 import com.highestpeak.config.Config;
 import com.highestpeak.entity.CommandChatType;
@@ -115,7 +116,7 @@ public abstract class ApiCommand extends PeakCommand {
         return cache;
     }
 
-    private Object getCached() {
+    Object getCached() {
         if (cacheObjectList.size() <= apiConfig.getCordonCacheNum() && !updateTaskSubimt.get()) {
             updateTaskSubimt.compareAndSet(false, true);
             CACHE_LOAD_EXECUTOR.submit(this::loadCache);
@@ -130,6 +131,7 @@ public abstract class ApiCommand extends PeakCommand {
     }
 
     private void loadCache() {
+        // 只有任务呗提交才会进行load
         if (updateTaskSubimt.get()) {
             List cacheObjects = getCacheObjects(apiConfig.getCacheNum() - cacheObjectList.size());
             synchronized (cacheListLock) {
@@ -144,10 +146,16 @@ public abstract class ApiCommand extends PeakCommand {
     @Override
     public void enableCommandOn(Long group, Long user) {
         if (group != null && group != MsgEventParams.FRIEND_TYPE_DEFAULT_GROUP_VALUE) {
-            apiConfig.getEnableGroup().add(group);
+            List<Long> enableGroup = apiConfig.getEnableGroup();
+            if (!enableGroup.contains(group)) {
+                enableGroup.add(group);
+            }
             Config.prepareUpdateConfig();
         } else if (user != null) {
-            apiConfig.getEnableUsers().add(user);
+            List<Long> enableUsers = apiConfig.getEnableUsers();
+            if (!enableUsers.contains(user)) {
+                enableUsers.add(user);
+            }
             Config.prepareUpdateConfig();
         }
     }
@@ -155,9 +163,11 @@ public abstract class ApiCommand extends PeakCommand {
     @Override
     public void disableCommandOn(Long group, Long user) {
         if (group != null) {
-            apiConfig.getEnableGroup().add(group);
+            apiConfig.getEnableGroup().remove(group);
+            Config.prepareUpdateConfig();
         } else if (user != null) {
-            apiConfig.getEnableUsers().add(user);
+            apiConfig.getEnableUsers().remove(user);
+            Config.prepareUpdateConfig();
         }
     }
 
@@ -184,7 +194,9 @@ public abstract class ApiCommand extends PeakCommand {
         try {
             FileInputStream is = new FileInputStream(cachedImage.getLocalImageFilePath());
             watch.reset();
-            Image uploadImage = ExternalResource.uploadAsImage(is, contact);
+            Image uploadImage = ExternalResource.uploadAsImage(is,
+                    PeakBot.getCURRENT_BOT().getGroups().stream().findAny().get()
+            );
             LogUtil.debug(() -> String.format("uploadAsImage耗时: %sms", watch.elapsed(TimeUnit.MILLISECONDS)));
             BotMessageHelper.sendMsg(contact, "[mirai:image:" + uploadImage.getImageId() + "]");
             watch.reset();
