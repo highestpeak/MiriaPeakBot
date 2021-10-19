@@ -17,7 +17,7 @@ public class BotMessageHelper {
         if (fromGroup == MsgEventParams.FRIEND_TYPE_DEFAULT_GROUP_VALUE) {
             sendToQQFriend(fromQQ, msg);
         } else {
-            sendToQQGroup(fromQQ, msg);
+            sendToQQGroup(fromGroup, msg);
         }
     }
 

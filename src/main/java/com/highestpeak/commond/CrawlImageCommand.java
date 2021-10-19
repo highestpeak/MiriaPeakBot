@@ -3,10 +3,7 @@ package com.highestpeak.commond;
 import com.google.common.collect.Lists;
 import com.highestpeak.config.ApiStrConfig;
 import com.highestpeak.config.CrawlConfig;
-import com.highestpeak.entity.CommandChatType;
-import com.highestpeak.entity.CommandUserType;
-import com.highestpeak.entity.ImageVo;
-import com.highestpeak.entity.MsgEventParams;
+import com.highestpeak.entity.*;
 import com.highestpeak.util.CommonUtil;
 import com.highestpeak.util.IdUtil;
 import com.highestpeak.util.LogUtil;
@@ -19,6 +16,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -70,7 +68,6 @@ public class CrawlImageCommand extends ApiCommand {
     private List<ImageVo> fetchImages(int count) {
         try {
             CrawlConfig config = getConfig();
-            String name = getConfig().getName();
             if (count <= 0) {
                 return Collections.emptyList();
             }
@@ -88,46 +85,63 @@ public class CrawlImageCommand extends ApiCommand {
                 return Collections.emptyList();
             }
 
-            String nextPage = apiStrConfig.selectNextPage();
-
-            Document document = Jsoup.connect(apiStrConfig.getApi()).get();
-            CrawlConfig.CrawlLocator locator = config.getLocator(apiStrConfig.getName());
-            Elements blockElements = document.select(locator.getBlockCssQuery());
-
-            int iter = 0;
-            List<ImageVo> imageLinkList = Lists.newArrayList();
-            for (Element blockElement : blockElements) {
-                if (iter == count) {
-                    break;
-                }
-                Element imageElement = blockElement.select(locator.getImgCssQuery()).first();
-                Element idElement = blockElement.select(locator.getIdCssQuery()).first();
-                if (imageElement != null && idElement != null) {
-                    String imageUrl = imageElement.attr(locator.getUrlAttr());
-                    String idValue = idElement.attr(locator.getIdAttr());
-                    String localImageFilePath = CommonUtil.requestAndDownloadPic(
-                            imageUrl, UUID.randomUUID().toString(), "jpg", name
-                    );
-                    if (StringUtils.isBlank(localImageFilePath)) {
-                        continue;
-                    }
-                    String id = IdUtil.hashId(nextPage, idValue, imageUrl);
-                    if (IdUtil.isIdExist(id)) {
-                        continue;
-                    }
-                    imageLinkList.add(ImageVo.builder()
-                            .id(id)
-                            .url(imageUrl)
-                            .localImageFilePath(localImageFilePath)
-                            .build());
-                    IdUtil.markIdAsExist("image", id, localImageFilePath, false);
-                    iter++;
-                }
+            String pageUrl = apiStrConfig.selectCurrentPage();
+            List<ImageVo> imageVos = crawlPage(pageUrl, config, apiStrConfig, count);
+            if (imageVos.isEmpty() || imageVos.size() < count) {
+                pageUrl = apiStrConfig.selectNextPage();
+                List<ImageVo> remainVos = crawlPage(pageUrl, config, apiStrConfig, count - imageVos.size());
+                imageVos.addAll(remainVos);
             }
-            return imageLinkList;
+            return imageVos;
         } catch (Exception e) {
             LogUtil.error("getOneImage error.", e);
             return Collections.emptyList();
         }
+    }
+
+    private List<ImageVo> crawlPage(String nextPage, CrawlConfig config, ApiStrConfig apiStrConfig, int count) throws Exception {
+        String crawlPageContent = CommonUtil.getCrawlPageContent(nextPage, apiStrConfig.isUseProxy());
+        if (StringUtils.isBlank(crawlPageContent)) {
+            throw new PeakBotException();
+        }
+        Document document = Jsoup.parse(crawlPageContent);
+        CrawlConfig.CrawlLocator locator = config.getLocator(apiStrConfig.getName());
+        Elements blockElements = document.select(locator.getBlockCssQuery());
+        String name = config.getName();
+
+        int iter = 0;
+        List<ImageVo> imageLinkList = Lists.newArrayList();
+        for (Element blockElement : blockElements) {
+            if (iter == count) {
+                break;
+            }
+            Element imageElement = blockElement.select(locator.getImgCssQuery()).first();
+            Element idElement = blockElement.select(locator.getIdCssQuery()).first();
+            if (imageElement != null && idElement != null) {
+                String imageUrl = imageElement.absUrl(locator.getUrlAttr());
+                String idValue = idElement.attr(locator.getIdAttr());
+                String localImageFilePath = CommonUtil.requestAndDownloadPic(
+                        imageUrl, UUID.randomUUID().toString(), "jpg", name, apiStrConfig.isUseProxy()
+                );
+                if (StringUtils.isBlank(localImageFilePath)) {
+                    continue;
+                }
+                String id = IdUtil.hashId(nextPage, idValue, imageUrl);
+                if (IdUtil.isIdExist(id)) {
+                    continue;
+                }
+                imageLinkList.add(ImageVo.builder()
+                        .id(id)
+                        .url(imageUrl)
+                        .localImageFilePath(localImageFilePath)
+                        .build());
+                IdUtil.markIdAsExist("image", id, localImageFilePath, false);
+                iter++;
+                if (imageLinkList.size() >= count) {
+                    break;
+                }
+            }
+        }
+        return imageLinkList;
     }
 }

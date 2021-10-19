@@ -1,10 +1,11 @@
 package com.highestpeak.config;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.highestpeak.entity.Constants;
+import com.highestpeak.util.AtomicIntegerJacksonHelper;
 import lombok.Data;
 
-import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Data
@@ -22,6 +23,11 @@ public class ApiStrConfig {
      * eg: 网易云随机热评
      */
     private String api = "https://api.vvhan.com/api/reping";
+
+    /**
+     * 是否使用代理
+     */
+    private boolean isUseProxy = false;
 
     /**
      * 是否是返回json信息的api
@@ -49,8 +55,17 @@ public class ApiStrConfig {
             "https://asiantolick.com/ajax/buscar_posts" +
                     ".php?post=&cat=&tag=1045&search=&index={#PeakBotPageUpdater}&ver=83";
 
-    @JsonIgnore
+    @JsonSerialize(using = AtomicIntegerJacksonHelper.AtomicIntegerSerializer.class, as = Integer.class)
+    @JsonDeserialize(using = AtomicIntegerJacksonHelper.AtomicIntegerDeserializer.class, as = AtomicInteger.class)
     private AtomicInteger pageIndex = new AtomicInteger(1);
+
+    public String selectCurrentPage() {
+        if (!isPageUpdater) {
+            return api;
+        }
+
+        return pageUrl.replace(Constants.PEAK_BOT_PAGE_UPDATER, Integer.toString(pageIndex.get()));
+    }
 
     public String selectNextPage() {
         if (!isPageUpdater) {

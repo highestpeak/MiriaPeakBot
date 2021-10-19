@@ -1,11 +1,13 @@
 package com.highestpeak.commond;
 
 import com.google.common.base.Stopwatch;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.highestpeak.PeakBot;
 import com.highestpeak.config.ApiConfig;
 import com.highestpeak.config.Config;
+import com.highestpeak.config.CrawlConfig;
 import com.highestpeak.entity.CommandChatType;
 import com.highestpeak.entity.CommandUserType;
 import com.highestpeak.entity.ImageVo;
@@ -20,6 +22,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.io.FileInputStream;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -28,6 +31,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 public abstract class ApiCommand extends PeakCommand {
+
+    public static final String LOCAL_CACHE_URL_PLACEHOLDER = "local cache";
+
+    public static final Set<Class<?>> CACHE_ENABLE_CLASS_SET = ImmutableSet.of(
+            ApiConfig.class, CrawlConfig.class
+    );
 
     private ApiConfig apiConfig;
 
@@ -39,7 +48,7 @@ public abstract class ApiCommand extends PeakCommand {
 
     private static final ScheduledExecutorService SCHEDULED_LOAD_CACHE_EXECUTOR = new ScheduledThreadPoolExecutor(1);
 
-    private static AtomicBoolean alreadyInitScheduledLoadCacheExecutor = new AtomicBoolean(false);
+    private AtomicBoolean alreadyInitScheduledLoadCacheExecutor = new AtomicBoolean(false);
 
     private AtomicBoolean updateTaskSubimt = new AtomicBoolean(false);
 
@@ -72,7 +81,7 @@ public abstract class ApiCommand extends PeakCommand {
 
     @Override
     public void setConfig(Object config) {
-        if (config instanceof ApiConfig) {
+        if (CACHE_ENABLE_CLASS_SET.contains(config.getClass())) {
             apiConfig = (ApiConfig) config;
             if (!apiConfig.isEnableCache()) {
                 LogUtil.info("config not enable cache. name:" + apiConfig.getName());
@@ -107,7 +116,7 @@ public abstract class ApiCommand extends PeakCommand {
         List<String> fileNotSends = fileNames.stream().filter(CommonUtil::isImageNotSend).collect(Collectors.toList());
         List<ImageVo> imageVoList = fileNotSends.stream()
                 .map(fileName -> ImageVo.builder()
-                        .url("local cache")
+                        .url(LOCAL_CACHE_URL_PLACEHOLDER)
                         .localImageFilePath(fileName)
                         .build()
                 ).collect(Collectors.toList());
@@ -194,11 +203,12 @@ public abstract class ApiCommand extends PeakCommand {
         try {
             FileInputStream is = new FileInputStream(cachedImage.getLocalImageFilePath());
             watch.reset();
-            Image uploadImage = ExternalResource.uploadAsImage(is,
-                    PeakBot.getCURRENT_BOT().getGroups().stream().findAny().get()
-            );
+            Image uploadImage = ExternalResource.uploadAsImage(is, contact);
             LogUtil.debug(() -> String.format("uploadAsImage耗时: %sms", watch.elapsed(TimeUnit.MILLISECONDS)));
             BotMessageHelper.sendMsg(contact, "[mirai:image:" + uploadImage.getImageId() + "]");
+            if (!StringUtils.equalsIgnoreCase(cachedImage.getUrl(), LOCAL_CACHE_URL_PLACEHOLDER)) {
+                BotMessageHelper.sendMsg(contact, "链接地址: " + cachedImage.getUrl());
+            }
             watch.reset();
             synchronized (cacheListLock) {
                 cacheObjectList.remove(cached);

@@ -74,7 +74,7 @@ public class ApiImageCommand extends ApiCommand {
                     //Thread.sleep(500);
                 }
                 String localImageFilePath = CommonUtil.requestAndDownloadPic(
-                        imageUrl, UUID.randomUUID().toString(), "jpg", name
+                        imageUrl, UUID.randomUUID().toString(), "jpg", name, apiStrConfig.isUseProxy()
                 );
                 if (StringUtils.isBlank(localImageFilePath)) {
                     continue;

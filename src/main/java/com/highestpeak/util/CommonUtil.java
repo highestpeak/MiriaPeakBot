@@ -1,9 +1,9 @@
 package com.highestpeak.util;
 
+import com.google.common.io.CharStreams;
 import com.highestpeak.PeakBot;
 import com.highestpeak.config.Config;
 import com.highestpeak.config.ProxyConfig;
-import com.highestpeak.entity.ImageVo;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHost;
@@ -14,9 +14,13 @@ import org.apache.http.conn.ConnectTimeoutException;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 
-import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLException;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystemException;
 import java.util.Collection;
 import java.util.Collections;
@@ -25,24 +29,62 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class CommonUtil {
 
     private static final CloseableHttpClient HTTP_CLIENT = HttpClients.createDefault();
 
-    /**
-     * 对图片链设置referer绕过防盗链
-     */
-    public static String requestAndDownloadPic(String uri, String uid, String ext, String name) throws Exception {
-        if (StringUtils.isBlank(uri)) {
+    public static String getCrawlPageContent(String url, boolean useProxy) throws Exception {
+        if (StringUtils.isBlank(url)) {
+            return StringUtils.EMPTY;
+        }
+
+        StringBuilder content = new StringBuilder();
+
+        requestAndDo(url, useProxy, (contentStream) -> {
+            try {
+                content.append(
+                        CharStreams.toString(new InputStreamReader(contentStream, StandardCharsets.UTF_8))
+                );
+            } catch (IOException e) {
+                LogUtil.error("获取内容失败", e);
+            }
+        });
+
+        return content.toString();
+    }
+
+    public static String requestAndDownloadPic(String url, String uid, String ext, String name, boolean useProxy) throws Exception {
+        if (StringUtils.isBlank(url)) {
             return StringUtils.EMPTY;
         }
         String path = "./data/Image/" + name + "/";
         String filePath = path + uid + "." + ext;
 
+        AtomicBoolean isOk = new AtomicBoolean(false);
+
+        // 默认使用 proxy 其他由内部判断
+        requestAndDo(url, useProxy, (contentStream) -> {
+            try {
+                FileUtils.copyToFile(contentStream, new File(filePath));
+                isOk.set(true);
+            } catch (Exception e) {
+                LogUtil.error("下载图片失败", e);
+            }
+        });
+
+        return isOk.get() ? filePath : StringUtils.EMPTY;
+    }
+
+    public static void requestAndDo(String url, boolean useProxy, Consumer<InputStream> contentConsumer) throws Exception {
+        if (StringUtils.isBlank(url)) {
+            return;
+        }
+
         // 创建http GET请求
-        HttpGet httpGet = new HttpGet(uri);
+        HttpGet httpGet = new HttpGet(url);
         httpGet.addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, " +
                 "like Gecko) Chrome/91.0.4472.124 Safari/537.36 Edg/91.0.864.67");
         RequestConfig.Builder requestConfigBuilder = RequestConfig.custom()
@@ -51,36 +93,31 @@ public class CommonUtil {
                 .setSocketTimeout(10000);
         //设置代理IP、端口、协议（请分别替换）
         ProxyConfig proxyConfig = Config.get().getProxyConfig();
-        if (proxyConfig.isEnable() && !proxyConfig.isShadowsocks()) {
+        if (useProxy && proxyConfig.isEnable() && !proxyConfig.isShadowsocks()) {
             HttpHost proxy = new HttpHost(proxyConfig.getHost(), proxyConfig.getPort(), proxyConfig.getScheme());
             requestConfigBuilder.setProxy(proxy);
         }
         RequestConfig config = requestConfigBuilder.build();
         httpGet.setConfig(config);
-        try (CloseableHttpResponse response = proxyConfig.isShadowsocks()
+        try (CloseableHttpResponse response = proxyConfig.isShadowsocks() && useProxy
                 ? ShadowsocksClientHelper.execute(httpGet)
                 : HTTP_CLIENT.execute(httpGet)
         ) {
             // 判断返回状态是否为200
             int statusCode = response.getStatusLine().getStatusCode();
             if (statusCode != 200) {
-                LogUtil.warn(String.format("获取响应非200. uri: %s, code: %s", uri, statusCode));
-                return StringUtils.EMPTY;
+                LogUtil.warn(String.format("获取响应非200. url: %s, code: %s", url, statusCode));
+                return;
             }
-            FileUtils.copyToFile(response.getEntity().getContent(), new File(filePath));
-            return filePath;
+            contentConsumer.accept(response.getEntity().getContent());
         } catch (ConnectTimeoutException e) {
-            LogUtil.warn(String.format("下载图片链接超时 uri: %s msg: %s", uri, e.getMessage()));
-            return StringUtils.EMPTY;
+            LogUtil.warn(String.format("requestAndDo链接超时 url: %s msg: %s", url, e.getMessage()));
         } catch (SocketTimeoutException e) {
-            LogUtil.warn("下载图片超时 uri:" + uri);
-            return StringUtils.EMPTY;
-        } catch (SSLHandshakeException e) {
-            LogUtil.warn("下载图片失败. ssl 异常" + e.getMessage());
-            return StringUtils.EMPTY;
+            LogUtil.warn("requestAndDo超时 url:" + url);
+        } catch (SSLException e) {
+            LogUtil.warn("requestAndDo失败. ssl 异常" + e.getMessage());
         } catch (Exception e) {
-            LogUtil.error("下载图片失败", e);
-            return StringUtils.EMPTY;
+            LogUtil.error("requestAndDo失败", e);
         }
     }
 

@@ -1,8 +1,10 @@
 package com.highestpeak.config;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.collect.Lists;
 import com.highestpeak.entity.Constants;
+import com.highestpeak.util.AtomicIntegerJacksonHelper;
 import lombok.Data;
 
 import java.util.List;
@@ -60,7 +62,8 @@ public class ApiConfig {
      */
     private int cordonCacheNum = Constants.DEFAULT_CACHE_NUM / 2;
 
-    @JsonIgnore
+    @JsonSerialize(using = AtomicIntegerJacksonHelper.AtomicIntegerSerializer.class, as = Integer.class)
+    @JsonDeserialize(using = AtomicIntegerJacksonHelper.AtomicIntegerDeserializer.class, as = AtomicInteger.class)
     private AtomicInteger apiIndex = new AtomicInteger(0);
 
     /**

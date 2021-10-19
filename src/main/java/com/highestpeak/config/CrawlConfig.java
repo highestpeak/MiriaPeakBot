@@ -45,5 +45,18 @@ public class CrawlConfig extends ApiConfig {
          * 定位到元素后取出那个字段的值
          */
         private String idAttr;
+
+        /**
+         * todo
+         *
+         *
+         * 块内的选择器，块内某个标签有图片详情页面
+         */
+        private String pageCssQuery;
+
+        /**
+         * 定位到元素后取出那个字段的值
+         */
+        private String pageAttr;
     }
 }
