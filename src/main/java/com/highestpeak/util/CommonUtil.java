@@ -36,6 +36,10 @@ public class CommonUtil {
 
     private static final CloseableHttpClient HTTP_CLIENT = HttpClients.createDefault();
 
+    public static String readLocalHtmlContent(String fileName) throws IOException {
+        return FileUtils.readFileToString(new File(fileName), StandardCharsets.UTF_8);
+    }
+
     public static String getCrawlPageContent(String url, boolean useProxy) throws Exception {
         if (StringUtils.isBlank(url)) {
             return StringUtils.EMPTY;

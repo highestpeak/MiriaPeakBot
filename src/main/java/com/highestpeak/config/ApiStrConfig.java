@@ -10,6 +10,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Data
 public class ApiStrConfig {
+
+    public static final String LOCAL_CACHE_URL_PLACEHOLDER = "local cache";
+
     public static final ApiStrConfig DEFAULT = new ApiStrConfig();
 
     /**
@@ -33,6 +36,12 @@ public class ApiStrConfig {
      * 是否是返回json信息的api
      */
     private boolean isJsonRedirect = false;
+
+    /**
+     * 是否是本地的 html <br/>
+     * 如果是本地的 html 则 api 是文件名
+     */
+    private boolean isLocalHtml = false;
 
     /**
      * 内容在json中的路径

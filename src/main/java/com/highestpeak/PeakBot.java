@@ -147,6 +147,9 @@ public final class PeakBot extends JavaPlugin {
             List<ApiConfig> apiImageConfigs = config.getApiImageConfigs();
             List<ApiImageCommand> apiImageCommands = Lists.newArrayListWithCapacity(apiImageConfigs.size());
             for (ApiConfig apiImageConfig : apiImageConfigs) {
+                if (!apiImageConfig.isEnable()) {
+                    continue;
+                }
                 ApiImageCommand apiImageCommand = new ApiImageCommand(apiImageConfig.getCommands());
                 apiImageCommand.setConfig(apiImageConfig);
                 apiImageCommands.add(apiImageCommand);
@@ -157,6 +160,9 @@ public final class PeakBot extends JavaPlugin {
             List<CrawlConfig> crawlConfigs = config.getCrawlImageConfigs();
             List<CrawlImageCommand> crawlImageCommands = Lists.newArrayListWithCapacity(crawlConfigs.size());
             for (CrawlConfig crawlConfig : crawlConfigs) {
+                if (!crawlConfig.isEnable()) {
+                    continue;
+                }
                 CrawlImageCommand crawlImageCommand = new CrawlImageCommand(crawlConfig.getCommands());
                 crawlImageCommand.setConfig(crawlConfig);
                 crawlImageCommands.add(crawlImageCommand);
@@ -167,6 +173,9 @@ public final class PeakBot extends JavaPlugin {
             List<ApiConfig> apiTextConfigs = config.getApiTextConfigs();
             List<ApiTextCommand> apiTextCommands = Lists.newArrayListWithCapacity(apiTextConfigs.size());
             for (ApiConfig apiTextConfig : config.getApiTextConfigs()) {
+                if (!apiTextConfig.isEnable()) {
+                    continue;
+                }
                 ApiTextCommand apiTextCommand = new ApiTextCommand(apiTextConfig.getCommands());
                 apiTextCommand.setConfig(apiTextConfig);
                 apiTextCommands.add(apiTextCommand);

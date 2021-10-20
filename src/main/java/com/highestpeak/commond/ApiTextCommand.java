@@ -1,7 +1,5 @@
 package com.highestpeak.commond;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.highestpeak.config.ApiConfig;
 import com.highestpeak.config.ApiStrConfig;
 import com.highestpeak.entity.CommandChatType;
 import com.highestpeak.entity.CommandUserType;

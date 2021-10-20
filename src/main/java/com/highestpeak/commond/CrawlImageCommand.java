@@ -2,10 +2,10 @@ package com.highestpeak.commond;
 
 import com.google.common.collect.Lists;
 import com.highestpeak.config.ApiStrConfig;
+import com.highestpeak.config.Config;
 import com.highestpeak.config.CrawlConfig;
 import com.highestpeak.entity.*;
 import com.highestpeak.util.CommonUtil;
-import com.highestpeak.util.IdUtil;
 import com.highestpeak.util.LogUtil;
 import lombok.NonNull;
 import net.mamoe.mirai.contact.Friend;
@@ -16,10 +16,8 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
-import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * 是一种简单的三步策略图片发送
@@ -85,14 +83,25 @@ public class CrawlImageCommand extends ApiCommand {
                 return Collections.emptyList();
             }
 
-            String pageUrl = apiStrConfig.selectCurrentPage();
-            List<ImageVo> imageVos = crawlPage(pageUrl, config, apiStrConfig, count);
-            if (imageVos.isEmpty() || imageVos.size() < count) {
-                pageUrl = apiStrConfig.selectNextPage();
-                List<ImageVo> remainVos = crawlPage(pageUrl, config, apiStrConfig, count - imageVos.size());
-                imageVos.addAll(remainVos);
+            if (apiStrConfig.isLocalHtml()) {
+                String htmlFileName = apiStrConfig.selectCurrentPage();
+                List<ImageVo> imageVos = crawlPage(htmlFileName, config, apiStrConfig, count);
+                if (imageVos.isEmpty() || imageVos.size() < count) {
+                    htmlFileName = apiStrConfig.selectNextPage();
+                    List<ImageVo> remainVos = parseLocalPage(htmlFileName, config, apiStrConfig, count - imageVos.size());
+                    imageVos.addAll(remainVos);
+                }
+                return imageVos;
+            } else {
+                String pageUrl = apiStrConfig.selectCurrentPage();
+                List<ImageVo> imageVos = crawlPage(pageUrl, config, apiStrConfig, count);
+                if (imageVos.isEmpty() || imageVos.size() < count) {
+                    pageUrl = apiStrConfig.selectNextPage();
+                    List<ImageVo> remainVos = crawlPage(pageUrl, config, apiStrConfig, count - imageVos.size());
+                    imageVos.addAll(remainVos);
+                }
+                return imageVos;
             }
-            return imageVos;
         } catch (Exception e) {
             LogUtil.error("getOneImage error.", e);
             return Collections.emptyList();
@@ -105,6 +114,21 @@ public class CrawlImageCommand extends ApiCommand {
             throw new PeakBotException();
         }
         Document document = Jsoup.parse(crawlPageContent);
+        return parseHtml(document, config, apiStrConfig, count);
+    }
+
+    private List<ImageVo> parseLocalPage(String nextPageFileName, CrawlConfig config, ApiStrConfig apiStrConfig,
+                                         int count) throws Exception {
+        String pageFilePath = "./data/page/" + getConfig().getName() + "/" + nextPageFileName;
+        String localHtmlContent = CommonUtil.readLocalHtmlContent(pageFilePath);
+        if (StringUtils.isBlank(localHtmlContent)) {
+            throw new PeakBotException();
+        }
+        Document document = Jsoup.parse(localHtmlContent);
+        return parseHtml(document, config, apiStrConfig, count);
+    }
+
+    private List<ImageVo> parseHtml(Document document, CrawlConfig config, ApiStrConfig apiStrConfig, int count) throws Exception {
         CrawlConfig.CrawlLocator locator = config.getLocator(apiStrConfig.getName());
         Elements blockElements = document.select(locator.getBlockCssQuery());
         String name = config.getName();
@@ -117,26 +141,19 @@ public class CrawlImageCommand extends ApiCommand {
             }
             Element imageElement = blockElement.select(locator.getImgCssQuery()).first();
             Element idElement = blockElement.select(locator.getIdCssQuery()).first();
+            Element pageElement = blockElement.select(locator.getPageCssQuery()).first();
             if (imageElement != null && idElement != null) {
                 String imageUrl = imageElement.absUrl(locator.getUrlAttr());
                 String idValue = idElement.attr(locator.getIdAttr());
-                String localImageFilePath = CommonUtil.requestAndDownloadPic(
-                        imageUrl, UUID.randomUUID().toString(), "jpg", name, apiStrConfig.isUseProxy()
-                );
-                if (StringUtils.isBlank(localImageFilePath)) {
-                    continue;
+                ImageVo imageVo = processParsedPic(apiStrConfig, idValue, imageUrl, name);
+                if (pageElement!=null) {
+                    String pageValue = pageElement.attr(locator.getPageAttr());
+                    imageVo.setPageUrl(pageValue);
                 }
-                String id = IdUtil.hashId(nextPage, idValue, imageUrl);
-                if (IdUtil.isIdExist(id)) {
+                if (imageVo==null)
                     continue;
-                }
-                imageLinkList.add(ImageVo.builder()
-                        .id(id)
-                        .url(imageUrl)
-                        .localImageFilePath(localImageFilePath)
-                        .build());
-                IdUtil.markIdAsExist("image", id, localImageFilePath, false);
                 iter++;
+                imageLinkList.add(imageVo);
                 if (imageLinkList.size() >= count) {
                     break;
                 }

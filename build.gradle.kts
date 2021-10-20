@@ -45,4 +45,7 @@ dependencies {
     // https://mvnrepository.com/artifact/com.jayway.jsonpath/json-path
     implementation("com.jayway.jsonpath:json-path:2.6.0")
 
+    // https://mvnrepository.com/artifact/org.seleniumhq.selenium/selenium-java
+    implementation("org.seleniumhq.selenium:selenium-java:4.0.0")
+
 }

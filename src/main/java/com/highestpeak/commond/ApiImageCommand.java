@@ -1,27 +1,20 @@
 package com.highestpeak.commond;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Lists;
-import com.highestpeak.PeakBot;
 import com.highestpeak.config.ApiStrConfig;
 import com.highestpeak.entity.CommandChatType;
 import com.highestpeak.entity.CommandUserType;
 import com.highestpeak.entity.ImageVo;
 import com.highestpeak.entity.MsgEventParams;
-import com.highestpeak.util.*;
+import com.highestpeak.util.JsonUtil;
+import com.highestpeak.util.LogUtil;
 import lombok.NonNull;
 import net.mamoe.mirai.contact.Friend;
 import net.mamoe.mirai.contact.Group;
-import net.mamoe.mirai.message.code.MiraiCode;
-import net.mamoe.mirai.message.data.Image;
-import net.mamoe.mirai.utils.ExternalResource;
 import org.apache.commons.lang3.StringUtils;
 
-import java.io.FileInputStream;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 /**
  * 通过某个图片api来获取图片
@@ -70,25 +63,11 @@ public class ApiImageCommand extends ApiCommand {
             try {
                 if (apiStrConfig.isJsonRedirect()) {
                     imageUrl = jsonRedirectToPicApi(apiStrConfig);
-                    // 降低抓取频率，防止被办
+                    // 降低抓取频率，防止被办，没必要，因为本来已经就很慢了
                     //Thread.sleep(500);
                 }
-                String localImageFilePath = CommonUtil.requestAndDownloadPic(
-                        imageUrl, UUID.randomUUID().toString(), "jpg", name, apiStrConfig.isUseProxy()
-                );
-                if (StringUtils.isBlank(localImageFilePath)) {
-                    continue;
-                }
-                String id = IdUtil.hashId(api, imageUrl);
-                if (IdUtil.isIdExist(id)) {
-                    continue;
-                }
-                imageVos.add(ImageVo.builder()
-                        .id(id)
-                        .url(imageUrl)
-                        .localImageFilePath(localImageFilePath)
-                        .build());
-                IdUtil.markIdAsExist("image", id, localImageFilePath, false);
+                ImageVo imageVo = processParsedPic(apiStrConfig, api, imageUrl, name);
+                imageVos.add(imageVo);
             } catch (Exception e) {
                 LogUtil.error(String.format("图片获取错误. name: %s, api: %s", name, api), e);
             }

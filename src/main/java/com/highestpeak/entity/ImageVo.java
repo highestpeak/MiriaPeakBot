@@ -13,5 +13,7 @@ public class ImageVo {
     private String url;
     private String desc;
 
+    private String pageUrl;
+
     private String localImageFilePath;
 }

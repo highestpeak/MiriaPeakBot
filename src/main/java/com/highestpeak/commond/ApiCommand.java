@@ -6,6 +6,7 @@ import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.highestpeak.PeakBot;
 import com.highestpeak.config.ApiConfig;
+import com.highestpeak.config.ApiStrConfig;
 import com.highestpeak.config.Config;
 import com.highestpeak.config.CrawlConfig;
 import com.highestpeak.entity.CommandChatType;
@@ -14,6 +15,7 @@ import com.highestpeak.entity.ImageVo;
 import com.highestpeak.entity.MsgEventParams;
 import com.highestpeak.util.BotMessageHelper;
 import com.highestpeak.util.CommonUtil;
+import com.highestpeak.util.IdUtil;
 import com.highestpeak.util.LogUtil;
 import net.mamoe.mirai.contact.Contact;
 import net.mamoe.mirai.message.data.Image;
@@ -23,6 +25,7 @@ import org.apache.commons.lang3.StringUtils;
 import java.io.FileInputStream;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -31,8 +34,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 public abstract class ApiCommand extends PeakCommand {
-
-    public static final String LOCAL_CACHE_URL_PLACEHOLDER = "local cache";
 
     public static final Set<Class<?>> CACHE_ENABLE_CLASS_SET = ImmutableSet.of(
             ApiConfig.class, CrawlConfig.class
@@ -48,9 +49,9 @@ public abstract class ApiCommand extends PeakCommand {
 
     private static final ScheduledExecutorService SCHEDULED_LOAD_CACHE_EXECUTOR = new ScheduledThreadPoolExecutor(1);
 
-    private AtomicBoolean alreadyInitScheduledLoadCacheExecutor = new AtomicBoolean(false);
+    private final AtomicBoolean alreadyInitScheduledLoadCacheExecutor = new AtomicBoolean(false);
 
-    private AtomicBoolean updateTaskSubimt = new AtomicBoolean(false);
+    private final AtomicBoolean updateTaskSubimt = new AtomicBoolean(false);
 
     public ApiCommand(List<String> rule) {
         super(rule);
@@ -116,7 +117,7 @@ public abstract class ApiCommand extends PeakCommand {
         List<String> fileNotSends = fileNames.stream().filter(CommonUtil::isImageNotSend).collect(Collectors.toList());
         List<ImageVo> imageVoList = fileNotSends.stream()
                 .map(fileName -> ImageVo.builder()
-                        .url(LOCAL_CACHE_URL_PLACEHOLDER)
+                        .url(ApiStrConfig.LOCAL_CACHE_URL_PLACEHOLDER)
                         .localImageFilePath(fileName)
                         .build()
                 ).collect(Collectors.toList());
@@ -206,8 +207,10 @@ public abstract class ApiCommand extends PeakCommand {
             Image uploadImage = ExternalResource.uploadAsImage(is, contact);
             LogUtil.debug(() -> String.format("uploadAsImage耗时: %sms", watch.elapsed(TimeUnit.MILLISECONDS)));
             BotMessageHelper.sendMsg(contact, "[mirai:image:" + uploadImage.getImageId() + "]");
-            if (!StringUtils.equalsIgnoreCase(cachedImage.getUrl(), LOCAL_CACHE_URL_PLACEHOLDER)) {
-                BotMessageHelper.sendMsg(contact, "链接地址: " + cachedImage.getUrl());
+            if (StringUtils.isNotBlank(cachedImage.getPageUrl())) {
+                BotMessageHelper.sendMsg(contact, "页面地址: " + cachedImage.getPageUrl());
+            } else if (!StringUtils.equalsIgnoreCase(cachedImage.getUrl(), ApiStrConfig.LOCAL_CACHE_URL_PLACEHOLDER)) {
+                BotMessageHelper.sendMsg(contact, "图片链接地址: " + cachedImage.getUrl());
             }
             watch.reset();
             synchronized (cacheListLock) {
@@ -222,6 +225,26 @@ public abstract class ApiCommand extends PeakCommand {
         if (watch.isRunning()) {
             watch.stop();
         }
+    }
+
+    protected ImageVo processParsedPic(ApiStrConfig apiStrConfig, String api, String imageUrl,
+                                       String name) throws Exception {
+        String localImageFilePath = CommonUtil.requestAndDownloadPic(
+                imageUrl, UUID.randomUUID().toString(), "jpg", name, apiStrConfig.isUseProxy()
+        );
+        if (StringUtils.isBlank(localImageFilePath)) {
+            return null;
+        }
+        String id = IdUtil.hashId(api, imageUrl);
+        if (IdUtil.isIdExist(id)) {
+            return null;
+        }
+        IdUtil.markIdAsExist("image", id, localImageFilePath, false);
+        return ImageVo.builder()
+                .id(id)
+                .url(imageUrl)
+                .localImageFilePath(localImageFilePath)
+                .build();
     }
 
 }
