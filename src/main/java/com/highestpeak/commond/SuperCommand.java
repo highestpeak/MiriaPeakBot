@@ -18,6 +18,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.StringTokenizer;
 import java.util.function.Function;
+import java.util.regex.Matcher;
 
 public class SuperCommand extends PeakCommand {
 
@@ -46,6 +47,12 @@ public class SuperCommand extends PeakCommand {
     @Override
     public boolean isEnable() {
         return true;
+    }
+
+    @Override
+    public boolean matchCommand(String msg) {
+        Matcher m = getPattern().matcher(msg);
+        return m.matches();
     }
 
     @Override
@@ -102,6 +109,7 @@ public class SuperCommand extends PeakCommand {
             iterTokenMsg(contact, msg.substring(SUPER_ADD_COMMAND.length()), this::addSuperUser);
         } else if (msg.startsWith(SUPER_DEL_COMMAND)) {
             iterTokenMsg(contact, msg.substring(SUPER_DEL_COMMAND.length()), this::delSuperUser);
+            // todo 可以在这里设定单独给某个好友添加权限
         } else if (msg.startsWith(SUPER_ENABLE_COMMAND)) {
             iterTokenMsg(contact, msg.substring(SUPER_ENABLE_COMMAND.length()), (token) -> enableCommand(token, event));
         } else if (msg.startsWith(SUPER_DISABLE_COMMAND)) {

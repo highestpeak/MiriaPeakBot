@@ -1,11 +1,13 @@
 package com.highestpeak.config;
 
+import com.beust.jcommander.internal.Sets;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.highestpeak.entity.Constants;
 import com.highestpeak.util.AtomicIntegerJacksonHelper;
 import lombok.Data;
 
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Data
@@ -61,11 +63,15 @@ public class ApiStrConfig {
      * 使用占位符来代表需要插入数字的地方
      */
     private String pageUrl =
-            "https://asiantolick.com/ajax/buscar_posts" +
-                    ".php?post=&cat=&tag=1045&search=&index={#PeakBotPageUpdater}&ver=83";
+            "https://xxx.com/xxx?index={#PeakBotPageUpdater}&ver=83";
 
-    @JsonSerialize(using = AtomicIntegerJacksonHelper.AtomicIntegerSerializer.class, as = Integer.class)
-    @JsonDeserialize(using = AtomicIntegerJacksonHelper.AtomicIntegerDeserializer.class, as = AtomicInteger.class)
+    /**
+     * 有些页面会有占位图
+     */
+    private Set<String> blackUrlList = Sets.newHashSet();
+
+    @JsonSerialize(using = AtomicIntegerJacksonHelper.AtomicIntegerSerializer.class)
+    @JsonDeserialize(using = AtomicIntegerJacksonHelper.AtomicIntegerDeserializer.class)
     private AtomicInteger pageIndex = new AtomicInteger(1);
 
     public String selectCurrentPage() {

@@ -4,6 +4,7 @@ import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.highestpeak.PeakBot;
 import com.highestpeak.config.ApiConfig;
 import com.highestpeak.config.ApiStrConfig;
@@ -24,12 +25,10 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.io.FileInputStream;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -45,9 +44,18 @@ public abstract class ApiCommand extends PeakCommand {
 
     private final Object cacheListLock = new Object();
 
-    private static final ExecutorService CACHE_LOAD_EXECUTOR = MoreExecutors.newDirectExecutorService();
+    private static final ExecutorService CACHE_LOAD_EXECUTOR = Executors.newFixedThreadPool(
+            4,
+            new ThreadFactoryBuilder().setNameFormat("cache-load-executor").build()
+    );
 
-    private static final ScheduledExecutorService SCHEDULED_LOAD_CACHE_EXECUTOR = new ScheduledThreadPoolExecutor(1);
+    private static final ScheduledExecutorService SCHEDULED_LOAD_CACHE_EXECUTOR =
+            new ScheduledThreadPoolExecutor(
+                    4,
+                    new ThreadFactoryBuilder().setNameFormat("scheduled-load-cache-executor").build()
+            );
+
+    private static int taskCount = 0;
 
     private final AtomicBoolean alreadyInitScheduledLoadCacheExecutor = new AtomicBoolean(false);
 
@@ -98,7 +106,14 @@ public abstract class ApiCommand extends PeakCommand {
                         CACHE_LOAD_EXECUTOR.submit(this::loadCache);
                     }
                 };
-                SCHEDULED_LOAD_CACHE_EXECUTOR.scheduleWithFixedDelay(cacheScheduleLoad, 0, 10, TimeUnit.SECONDS);
+
+                taskCount++;
+                SCHEDULED_LOAD_CACHE_EXECUTOR.scheduleWithFixedDelay(
+                        cacheScheduleLoad,
+                        10L * taskCount,
+                        10,
+                        TimeUnit.SECONDS
+                );
             }
         }
     }
@@ -131,7 +146,7 @@ public abstract class ApiCommand extends PeakCommand {
             updateTaskSubimt.compareAndSet(false, true);
             CACHE_LOAD_EXECUTOR.submit(this::loadCache);
         }
-        return cacheObjectList.stream().findAny().orElseGet(() -> {
+        return cacheObjectList.stream().filter(Objects::nonNull).findAny().orElseGet(() -> {
             List<Object> cacheObjects = getCacheObjects(1);
             if (cacheObjects.isEmpty()) {
                 return null;
@@ -196,7 +211,7 @@ public abstract class ApiCommand extends PeakCommand {
         Object cached = getCached();
         LogUtil.debug(() -> String.format("获取缓存对象耗时: %sms", watch.elapsed(TimeUnit.MILLISECONDS)));
         if (cached == null) {
-            BotMessageHelper.sendMsg(contact, "图片发送错误，未能生成图片");
+            BotMessageHelper.sendMsg(contact, "铁铁.给我和牛牛都放个假吧");
             watch.stop();
             return;
         }
@@ -218,6 +233,11 @@ public abstract class ApiCommand extends PeakCommand {
             }
             LogUtil.debug(() -> String.format("cacheObjectList remove耗时: %sms", watch.elapsed(TimeUnit.MILLISECONDS)));
             CommonUtil.markImageAlreadySend(cachedImage.getLocalImageFilePath());
+        } catch (IllegalStateException e) {
+            LogUtil.warn(String.format("图片可能被风控. name: %s, api: %s", name, cachedImage.getUrl()));
+            BotMessageHelper.sendMsg(contact, "图片可能被风控 " +
+                    (StringUtils.isNotBlank(cachedImage.getUrl()) ? cachedImage.getUrl() : "")
+            );
         } catch (Exception e) {
             LogUtil.error(String.format("图片发送错误. name: %s, api: %s", name, cachedImage.getUrl()), e);
             BotMessageHelper.sendMsg(contact, "图片发送错误");

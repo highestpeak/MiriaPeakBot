@@ -12,7 +12,7 @@ public class LogUtil {
         }
     }
 
-    public static void error(String message, Exception e) {
+    public static void error(String message, Throwable e) {
         if (PeakBot.isPluginLoaded()) {
             PeakBot.INSTANCE.getLogger().error(message, e);
         }

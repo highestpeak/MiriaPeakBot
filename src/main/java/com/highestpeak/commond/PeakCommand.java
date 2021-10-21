@@ -6,6 +6,7 @@ import com.highestpeak.entity.CommandUserType;
 import com.highestpeak.entity.MsgEventParams;
 import com.highestpeak.util.BotMessageHelper;
 import com.highestpeak.util.LogUtil;
+import lombok.Getter;
 import lombok.NonNull;
 import net.mamoe.mirai.contact.Friend;
 import net.mamoe.mirai.contact.Group;
@@ -14,9 +15,9 @@ import org.apache.commons.lang3.StringUtils;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+@Getter
 public abstract class PeakCommand {
 
     /**
@@ -26,12 +27,14 @@ public abstract class PeakCommand {
 
     private final String rule;
     private final Pattern pattern;
+    private Set<String> rules;
     private final Set<Integer> commandAllowChatTypes;
     private final Set<Integer> commandAllowSendUserTypes;
 
-    public PeakCommand(List<String> rule) {
-        this.rule = buildCommandMatchStr(rule);
+    public PeakCommand(List<String> rules) {
+        this.rule = buildCommandMatchStr(rules);
         this.pattern = Pattern.compile(this.rule);
+        this.rules = Sets.newHashSet(rules);
         this.commandAllowChatTypes = Sets.newHashSet();
         this.commandAllowSendUserTypes = Sets.newHashSet();
     }
@@ -72,8 +75,9 @@ public abstract class PeakCommand {
      * 判断该条消息是否匹配这个命令
      */
     public boolean matchCommand(String msg) {
-        Matcher m = pattern.matcher(msg);
-        return m.matches();
+        //Matcher m = pattern.matcher(msg);
+        //return m.matches();
+        return this.rules.contains(msg);
     }
 
     /**

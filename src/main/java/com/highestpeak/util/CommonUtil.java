@@ -75,7 +75,7 @@ public class CommonUtil {
                 FileUtils.copyToFile(contentStream, new File(filePath));
                 isOk.set(true);
             } catch (Exception e) {
-                LogUtil.error("下载图片失败", e);
+                throw new RuntimeException(e);
             }
         });
 
@@ -113,14 +113,18 @@ public class CommonUtil {
                 LogUtil.warn(String.format("获取响应非200. url: %s, code: %s", url, statusCode));
                 return;
             }
-            contentConsumer.accept(response.getEntity().getContent());
+            try {
+                contentConsumer.accept(response.getEntity().getContent());
+            } catch (Exception e) {
+                throw e.getCause();
+            }
         } catch (ConnectTimeoutException e) {
             LogUtil.warn(String.format("requestAndDo链接超时 url: %s msg: %s", url, e.getMessage()));
         } catch (SocketTimeoutException e) {
             LogUtil.warn("requestAndDo超时 url:" + url);
         } catch (SSLException e) {
             LogUtil.warn("requestAndDo失败. ssl 异常" + e.getMessage());
-        } catch (Exception e) {
+        } catch (Throwable e) {
             LogUtil.error("requestAndDo失败", e);
         }
     }

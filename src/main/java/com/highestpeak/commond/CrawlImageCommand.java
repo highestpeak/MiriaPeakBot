@@ -18,6 +18,7 @@ import org.jsoup.select.Elements;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 是一种简单的三步策略图片发送
@@ -85,10 +86,11 @@ public class CrawlImageCommand extends ApiCommand {
 
             if (apiStrConfig.isLocalHtml()) {
                 String htmlFileName = apiStrConfig.selectCurrentPage();
-                List<ImageVo> imageVos = crawlPage(htmlFileName, config, apiStrConfig, count);
+                List<ImageVo> imageVos = parseLocalPage(htmlFileName, config, apiStrConfig, count);
                 if (imageVos.isEmpty() || imageVos.size() < count) {
                     htmlFileName = apiStrConfig.selectNextPage();
-                    List<ImageVo> remainVos = parseLocalPage(htmlFileName, config, apiStrConfig, count - imageVos.size());
+                    List<ImageVo> remainVos = parseLocalPage(htmlFileName, config, apiStrConfig,
+                            count - imageVos.size());
                     imageVos.addAll(remainVos);
                 }
                 return imageVos;
@@ -114,6 +116,7 @@ public class CrawlImageCommand extends ApiCommand {
             throw new PeakBotException();
         }
         Document document = Jsoup.parse(crawlPageContent);
+        document.setBaseUri(nextPage);
         return parseHtml(document, config, apiStrConfig, count);
     }
 
@@ -132,6 +135,7 @@ public class CrawlImageCommand extends ApiCommand {
         CrawlConfig.CrawlLocator locator = config.getLocator(apiStrConfig.getName());
         Elements blockElements = document.select(locator.getBlockCssQuery());
         String name = config.getName();
+        Set<String> blackUrlList = apiStrConfig.getBlackUrlList();
 
         int iter = 0;
         List<ImageVo> imageLinkList = Lists.newArrayList();
@@ -141,17 +145,32 @@ public class CrawlImageCommand extends ApiCommand {
             }
             Element imageElement = blockElement.select(locator.getImgCssQuery()).first();
             Element idElement = blockElement.select(locator.getIdCssQuery()).first();
-            Element pageElement = blockElement.select(locator.getPageCssQuery()).first();
             if (imageElement != null && idElement != null) {
                 String imageUrl = imageElement.absUrl(locator.getUrlAttr());
+                if (StringUtils.isBlank(imageUrl)) {
+                    imageUrl = document.baseUri() + imageElement.attr(locator.getUrlAttr());
+                    if (StringUtils.isBlank(imageUrl)) {
+                        continue;
+                    }
+                }
+                if (blackUrlList != null && blackUrlList.contains(imageUrl)) {
+                    // 发现占位图
+                    continue;
+                }
                 String idValue = idElement.attr(locator.getIdAttr());
                 ImageVo imageVo = processParsedPic(apiStrConfig, idValue, imageUrl, name);
-                if (pageElement!=null) {
-                    String pageValue = pageElement.attr(locator.getPageAttr());
-                    imageVo.setPageUrl(pageValue);
-                }
-                if (imageVo==null)
+
+                if (imageVo == null) {
                     continue;
+                }
+                String pageCssQuery = locator.getPageCssQuery();
+                if (StringUtils.isNotBlank(pageCssQuery)) {
+                    Element pageElement = blockElement.select(pageCssQuery).first();
+                    if (pageElement != null) {
+                        String pageValue = pageElement.absUrl(locator.getPageAttr());
+                        imageVo.setPageUrl(pageValue);
+                    }
+                }
                 iter++;
                 imageLinkList.add(imageVo);
                 if (imageLinkList.size() >= count) {

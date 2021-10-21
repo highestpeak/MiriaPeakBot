@@ -62,8 +62,8 @@ public class ApiConfig {
      */
     private int cordonCacheNum = Constants.DEFAULT_CACHE_NUM / 2;
 
-    @JsonSerialize(using = AtomicIntegerJacksonHelper.AtomicIntegerSerializer.class, as = Integer.class)
-    @JsonDeserialize(using = AtomicIntegerJacksonHelper.AtomicIntegerDeserializer.class, as = AtomicInteger.class)
+    @JsonSerialize(using = AtomicIntegerJacksonHelper.AtomicIntegerSerializer.class)
+    @JsonDeserialize(using = AtomicIntegerJacksonHelper.AtomicIntegerDeserializer.class)
     private AtomicInteger apiIndex = new AtomicInteger(0);
 
     /**
